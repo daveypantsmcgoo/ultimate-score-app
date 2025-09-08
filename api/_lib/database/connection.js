@@ -18,7 +18,7 @@ export class DatabaseService {
   static async testConnection() {
     try {
       const result = await sql`SELECT NOW() as current_time`;
-      console.log('Database connected:', result.rows[0].current_time);
+      console.log('Database connected:', result[0]?.current_time);
       return true;
     } catch (error) {
       console.error('Database connection failed:', error);
@@ -40,7 +40,7 @@ export class DatabaseService {
         );
       `;
       
-      if (tableExists.rows[0].exists) {
+      if (tableExists[0]?.exists) {
         console.log('Database already initialized');
         return true;
       }
@@ -106,7 +106,8 @@ export class DatabaseService {
         WHERE division_id = ${divisionId} AND is_active = TRUE
         ORDER BY name
       `;
-      return result.rows;
+      console.log(`👥 Teams query result for division ${divisionId}:`, result?.length || 0, 'teams found');
+      return result || [];
     } catch (error) {
       console.error('Error getting teams:', error);
       return [];
@@ -132,7 +133,7 @@ export class DatabaseService {
           AND g.division_id = ${divisionId}
         ORDER BY g.game_datetime ASC
       `;
-      return result.rows;
+      return result || [];
     } catch (error) {
       console.error('Error getting team schedule:', error);
       return [];
@@ -146,7 +147,7 @@ export class DatabaseService {
         SELECT * FROM fields 
         ORDER BY name
       `;
-      return result.rows;
+      return result || [];
     } catch (error) {
       console.error('Error getting fields:', error);
       return [];
@@ -185,7 +186,7 @@ export class DatabaseService {
           LIMIT 1
         `;
       }
-      return result.rows[0] || null;
+      return result[0] || null;
     } catch (error) {
       console.error('Error getting latest refresh:', error);
       return null;
