@@ -8,6 +8,8 @@ async function handler(req, res) {
 
   try {
     console.log('📋 Fetching divisions from database...');
+    console.log('🔗 Database connection check:', !!process.env.POSTGRES_URL);
+    console.log('🔗 Storage URL check:', !!process.env.STORAGE_URL);
     
     const divisions = await DatabaseService.getDivisions();
     
