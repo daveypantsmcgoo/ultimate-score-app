@@ -74,6 +74,7 @@ export class DatabaseService {
   // Get divisions for current season
   static async getDivisions(seasonId = null) {
     try {
+      console.log('🔍 getDivisions called with seasonId:', seasonId);
       let result;
       if (seasonId) {
         result = await sql`
@@ -89,7 +90,9 @@ export class DatabaseService {
           ORDER BY d.name
         `;
       }
-      return result.rows;
+      console.log('📊 Query result:', { resultType: typeof result, hasRows: !!result?.rows, length: result?.rows?.length || result?.length });
+      // Handle different result formats from postgres package
+      return result?.rows || result || [];
     } catch (error) {
       console.error('Error getting divisions:', error);
       return [];
