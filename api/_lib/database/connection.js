@@ -64,7 +64,9 @@ export class DatabaseService {
         WHERE is_current = TRUE 
         LIMIT 1
       `;
-      return result.rows[0] || null;
+      console.log('🏛️ Current season query result:', result?.length || 0, 'seasons found');
+      // Handle postgres package result format (no .rows property)
+      return result?.[0] || null;
     } catch (error) {
       console.error('Error getting current season:', error);
       return null;
@@ -74,7 +76,6 @@ export class DatabaseService {
   // Get divisions for current season
   static async getDivisions(seasonId = null) {
     try {
-      console.log('🔍 getDivisions called with seasonId:', seasonId);
       let result;
       if (seasonId) {
         result = await sql`
@@ -90,9 +91,7 @@ export class DatabaseService {
           ORDER BY d.name
         `;
       }
-      console.log('📊 Query result:', { resultType: typeof result, hasRows: !!result?.rows, length: result?.rows?.length || result?.length });
-      // Handle different result formats from postgres package
-      return result?.rows || result || [];
+      return result || [];
     } catch (error) {
       console.error('Error getting divisions:', error);
       return [];
