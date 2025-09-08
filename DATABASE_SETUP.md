@@ -170,7 +170,9 @@ The old API endpoints (`/api/mufa/*`) still work but are slower. Gradually migra
 - Free tier only supports daily cron jobs (not every 10 minutes)
 - Manual database setup required (Postgres creation + schema)
 
-**🚀 Latest Deployment:** `https://ultimate-score-7z9qb82wh-greg-ks-projects.vercel.app`
+**🚀 Latest Deployment:** Auto-deployed from GitHub
+
+**✅ Database Connected:** Neon Postgres with MUFA schema initialized
 
 ## Success Metrics
 
