@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "@vercel/node@20.x"
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/scrape-schedule",
