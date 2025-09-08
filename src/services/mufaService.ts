@@ -1,7 +1,7 @@
 import { Division, Team, Game, Field } from '../types';
 
-// Replace with your actual Vercel deployment URL after deploying
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://ultimate-score-7z9qb82wh-greg-ks-projects.vercel.app/api/v2';
+// Use the production domain for the API
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://ultimate-score-app-one.vercel.app/api/v2';
 const API_KEY = 'mufa-public-2025';
 const MUFA_BASE_URL = 'https://www.mufa.org';
 
@@ -26,15 +26,8 @@ export class MufaService {
       return await response.json();
     } catch (error) {
       console.error('Error fetching divisions:', error);
-      // Fallback to mock data
-      return [
-        { id: '517', name: 'Sun - FMP', season: 'Fall 2025' },
-        { id: '518', name: 'Sun - MMP', season: 'Fall 2025' },
-        { id: '519', name: 'Mon (Early Bird) - Mixed', season: 'Fall 2025' },
-        { id: '520', name: 'Tue - Mixed', season: 'Fall 2025' },
-        { id: '521', name: 'Wed - Mixed', season: 'Fall 2025' },
-        { id: '522', name: 'Thu - Mixed', season: 'Fall 2025' },
-      ];
+      // Fallback to basic error state - user should refresh
+      return [];
     }
   }
 
@@ -47,20 +40,8 @@ export class MufaService {
       return await response.json();
     } catch (error) {
       console.error('Error fetching teams:', error);
-      // Fallback to mock data
-      const mockTeams: { [key: string]: Team[] } = {
-        '517': [
-          { id: '6097', name: 'Dryad', divisionId: '517', jerseyColor: 'Neon Pink' },
-          { id: '6098', name: 'Thunder Cats', divisionId: '517', jerseyColor: 'Blue' },
-          { id: '6099', name: 'Phoenix Rising', divisionId: '517', jerseyColor: 'Red' },
-          { id: '6100', name: 'Storm Chasers', divisionId: '517', jerseyColor: 'Green' },
-        ],
-        '518': [
-          { id: '6101', name: 'Lightning Bolts', divisionId: '518', jerseyColor: 'Yellow' },
-          { id: '6102', name: 'Wind Warriors', divisionId: '518', jerseyColor: 'Purple' },
-        ]
-      };
-      return mockTeams[divisionId] || [];
+      // Return empty array - user should refresh to retry
+      return [];
     }
   }
 
@@ -79,45 +60,8 @@ export class MufaService {
       }));
     } catch (error) {
       console.error('Error fetching schedule:', error);
-      // Fallback to mock data
-      const mockFields: Field[] = [
-        { 
-          id: 'burr1', 
-          name: 'Burr Jones 1',
-          mapUrl: 'https://maps.google.com/burr-jones',
-          diagramUrl: 'https://mufa.org/fields/burr-jones-diagram.jpg'
-        },
-        { 
-          id: 'demetral2', 
-          name: 'Demetral 2',
-          mapUrl: 'https://maps.google.com/demetral',
-          diagramUrl: 'https://mufa.org/fields/demetral-diagram.jpg'
-        }
-      ];
-
-      const mockTeam: Team = { id: teamId, name: 'Your Team', divisionId };
-      const mockOpponent: Team = { id: '6098', name: 'Thunder Cats', divisionId };
-
-      return [
-        {
-          id: 'game1',
-          date: new Date('2025-02-23'),
-          time: '1:00 PM',
-          teamA: mockTeam,
-          teamB: mockOpponent,
-          field: mockFields[0],
-          isComplete: false
-        },
-        {
-          id: 'game2',
-          date: new Date('2025-03-02'),
-          time: '2:30 PM',
-          teamA: mockOpponent,
-          teamB: mockTeam,
-          field: mockFields[1],
-          isComplete: false
-        }
-      ];
+      // Return empty array - user should refresh to retry
+      return [];
     }
   }
 
