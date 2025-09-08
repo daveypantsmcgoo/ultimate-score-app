@@ -30,17 +30,14 @@ export default async function handler(req, res) {
 
     console.log(`📋 Found ${divisions.length} divisions to scrape`);
 
-    let totalUpdated = 0;
-    const results = {};
-
-    // Scrape each division
-    for (const division of divisions) {
-      console.log(`🔍 Scraping division: ${division.name} (${division.id})`);
+    // Process divisions in parallel for much better performance
+    console.log(`🚀 Processing ${divisions.length} divisions in parallel...`);
+    
+    const divisionPromises = divisions.map(async (division) => {
+      console.log(`🔍 Starting division: ${division.name} (${division.id})`);
       
       try {
         const divisionResult = await scrapeDivisionData(division);
-        results[division.id] = divisionResult;
-        totalUpdated += divisionResult.gamesUpdated;
         
         // Log successful refresh
         await DatabaseService.logRefresh(
@@ -52,9 +49,11 @@ export default async function handler(req, res) {
           Date.now() - startTime
         );
         
+        console.log(`✅ Completed division ${division.id}: ${divisionResult.gamesUpdated} games updated`);
+        return { [division.id]: divisionResult };
+        
       } catch (divisionError) {
         console.error(`❌ Error scraping division ${division.id}:`, divisionError);
-        results[division.id] = { error: divisionError.message };
         
         // Log failed refresh
         await DatabaseService.logRefresh(
@@ -65,8 +64,25 @@ export default async function handler(req, res) {
           divisionError.message, 
           Date.now() - startTime
         );
+        
+        return { [division.id]: { error: divisionError.message } };
       }
-    }
+    });
+
+    // Wait for all divisions to complete
+    const divisionResults = await Promise.all(divisionPromises);
+    
+    // Combine results
+    const results = {};
+    let totalUpdated = 0;
+    
+    divisionResults.forEach(result => {
+      Object.assign(results, result);
+      const divisionId = Object.keys(result)[0];
+      if (result[divisionId].gamesUpdated) {
+        totalUpdated += result[divisionId].gamesUpdated;
+      }
+    });
 
     const duration = Date.now() - startTime;
     console.log(`✅ Scraping completed in ${duration}ms. Total games updated: ${totalUpdated}`);
