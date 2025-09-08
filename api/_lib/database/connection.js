@@ -154,6 +154,110 @@ export class DatabaseService {
     }
   }
 
+  // Ensure migration columns exist (auto-migrate on first use)
+  static async ensureMigration() {
+    try {
+      await sql.unsafe(`
+        ALTER TABLE teams ADD COLUMN IF NOT EXISTS last_scraped TIMESTAMP WITH TIME ZONE;
+        ALTER TABLE games ADD COLUMN IF NOT EXISTS last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+        ALTER TABLE seasons ADD COLUMN IF NOT EXISTS last_full_scrape TIMESTAMP WITH TIME ZONE;
+        ALTER TABLE seasons ADD COLUMN IF NOT EXISTS force_refresh BOOLEAN DEFAULT FALSE;
+        
+        CREATE INDEX IF NOT EXISTS idx_teams_last_scraped ON teams(last_scraped);
+        CREATE INDEX IF NOT EXISTS idx_games_last_updated ON games(last_updated);
+        CREATE INDEX IF NOT EXISTS idx_games_date_complete ON games(game_date, is_complete);
+        CREATE INDEX IF NOT EXISTS idx_teams_division_scraped ON teams(division_id, last_scraped);
+      `);
+      
+      // Set baseline timestamps for existing records
+      await sql`UPDATE teams SET last_scraped = NOW() - INTERVAL '1 day' WHERE last_scraped IS NULL`;
+      await sql`UPDATE games SET last_updated = updated_at WHERE last_updated IS NULL`;
+      await sql`UPDATE seasons SET last_full_scrape = NOW() - INTERVAL '1 day' WHERE last_full_scrape IS NULL AND is_current = TRUE`;
+      
+      console.log('✅ Migration ensured - selective scraping ready');
+    } catch (error) {
+      console.warn('⚠️ Migration check failed (may already exist):', error.message);
+    }
+  }
+
+  // Get teams that need scraping (stale or never scraped)
+  static async getStaleTeams(divisionId = null, maxAgeMinutes = 120) {
+    try {
+      await this.ensureMigration();
+      
+      const cutoffTime = new Date(Date.now() - maxAgeMinutes * 60 * 1000);
+      
+      let query;
+      if (divisionId) {
+        query = sql`
+          SELECT t.*, d.name as division_name
+          FROM teams t
+          LEFT JOIN divisions d ON t.division_id = d.id
+          WHERE t.division_id = ${divisionId}
+            AND (t.last_scraped IS NULL OR t.last_scraped < ${cutoffTime})
+            AND t.is_active = TRUE
+          ORDER BY t.last_scraped ASC NULLS FIRST
+        `;
+      } else {
+        query = sql`
+          SELECT t.*, d.name as division_name
+          FROM teams t
+          LEFT JOIN divisions d ON t.division_id = d.id
+          WHERE (t.last_scraped IS NULL OR t.last_scraped < ${cutoffTime})
+            AND t.is_active = TRUE
+          ORDER BY t.last_scraped ASC NULLS FIRST
+        `;
+      }
+      
+      const result = await query;
+      console.log(`📊 Found ${result?.length || 0} stale teams (older than ${maxAgeMinutes} minutes)`);
+      return result || [];
+    } catch (error) {
+      console.error('Error getting stale teams:', error);
+      return [];
+    }
+  }
+
+  // Check if force refresh is enabled
+  static async shouldForceRefresh() {
+    try {
+      const result = await sql`
+        SELECT force_refresh FROM seasons WHERE is_current = TRUE LIMIT 1
+      `;
+      return result?.[0]?.force_refresh || false;
+    } catch (error) {
+      console.error('Error checking force refresh:', error);
+      return false;
+    }
+  }
+
+  // Set force refresh flag
+  static async setForceRefresh(enabled = true) {
+    try {
+      await sql`
+        UPDATE seasons 
+        SET force_refresh = ${enabled} 
+        WHERE is_current = TRUE
+      `;
+      console.log(`🔄 Force refresh ${enabled ? 'enabled' : 'disabled'}`);
+    } catch (error) {
+      console.error('Error setting force refresh:', error);
+    }
+  }
+
+  // Update team's last scraped timestamp
+  static async updateTeamScrapedTime(teamId) {
+    try {
+      await sql`
+        UPDATE teams 
+        SET last_scraped = NOW() 
+        WHERE id = ${teamId}
+      `;
+    } catch (error) {
+      console.error(`Error updating scraped time for team ${teamId}:`, error);
+    }
+  }
+
   // Log data refresh
   static async logRefresh(dataType, divisionId, success, recordsUpdated = 0, errorMessage = null, durationMs = 0) {
     try {

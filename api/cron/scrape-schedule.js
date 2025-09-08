@@ -3,6 +3,15 @@ import { DatabaseService, sql } from '../_lib/database/connection.js';
 
 const MUFA_BASE_URL = 'https://www.mufa.org';
 
+// HTTP optimization - reusable headers with keep-alive connections
+const httpHeaders = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+  'Connection': 'keep-alive',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.5',
+  'Cache-Control': 'no-cache'
+};
+
 export default async function handler(req, res) {
   // Verify this is a cron request or admin request
   const authHeader = req.headers.authorization;
@@ -72,20 +81,37 @@ export default async function handler(req, res) {
     // Wait for all divisions to complete
     const divisionResults = await Promise.all(divisionPromises);
     
-    // Combine results
+    // Combine results and analyze performance
     const results = {};
     let totalUpdated = 0;
+    let totalSkipped = 0;
+    let selectiveCount = 0;
     
     divisionResults.forEach(result => {
       Object.assign(results, result);
       const divisionId = Object.keys(result)[0];
-      if (result[divisionId].gamesUpdated) {
-        totalUpdated += result[divisionId].gamesUpdated;
+      const divResult = result[divisionId];
+      
+      if (divResult.gamesUpdated !== undefined) {
+        totalUpdated += divResult.gamesUpdated;
+      }
+      if (divResult.skipped) {
+        totalSkipped++;
+      }
+      if (divResult.selective) {
+        selectiveCount++;
       }
     });
 
+    // Reset force refresh flag if it was enabled
+    if (await DatabaseService.shouldForceRefresh()) {
+      await DatabaseService.setForceRefresh(false);
+      console.log('🔄 Force refresh flag reset after completion');
+    }
+
     const duration = Date.now() - startTime;
-    console.log(`✅ Scraping completed in ${duration}ms. Total games updated: ${totalUpdated}`);
+    const efficiency = totalSkipped > 0 ? ` (${totalSkipped} divisions skipped, ${selectiveCount} used selective refresh)` : '';
+    console.log(`✅ Scraping completed in ${duration}ms. Total games updated: ${totalUpdated}${efficiency}`);
 
     return res.status(200).json({
       success: true,
@@ -111,38 +137,67 @@ export default async function handler(req, res) {
 }
 
 async function scrapeDivisionData(division) {
-  // First, get teams for this division (we'll need them for game scraping)
-  let teams = await DatabaseService.getTeams(division.id);
+  // Check if force refresh is enabled
+  const forceRefresh = await DatabaseService.shouldForceRefresh();
   
-  // If no teams in database, scrape them first
-  if (teams.length === 0) {
-    console.log(`📝 No teams found for ${division.id}, scraping teams first...`);
-    teams = await scrapeAndStoreTeams(division);
+  let teams;
+  if (forceRefresh) {
+    // Force refresh: get all teams
+    teams = await DatabaseService.getTeams(division.id);
+    console.log(`🔄 Force refresh enabled - processing all ${teams.length} teams in ${division.id}`);
+  } else {
+    // Selective refresh: only get stale teams (default: older than 2 hours)
+    teams = await DatabaseService.getStaleTeams(division.id, 120);
+    console.log(`⚡ Selective refresh - processing ${teams.length} stale teams in ${division.id}`);
   }
-
-  console.log(`👥 Found ${teams.length} teams in division ${division.id}`);
-
-  let gamesUpdated = 0;
-
-  // Scrape schedule for each team
-  for (const team of teams) {
-    try {
-      const teamGames = await scrapeTeamSchedule(team, division.id);
-      gamesUpdated += teamGames.length;
-      console.log(`📅 Updated ${teamGames.length} games for team ${team.name}`);
-    } catch (teamError) {
-      console.error(`❌ Error scraping team ${team.id}:`, teamError);
+  
+  // If no teams found and not a force refresh, check if we need to scrape new teams
+  if (teams.length === 0 && !forceRefresh) {
+    const allTeams = await DatabaseService.getTeams(division.id);
+    if (allTeams.length === 0) {
+      console.log(`📝 No teams found for ${division.id}, scraping teams first...`);
+      teams = await scrapeAndStoreTeams(division);
+    } else {
+      console.log(`✅ All teams in ${division.id} are up to date - skipping`);
+      return { gamesUpdated: 0, teamsCount: allTeams.length, skipped: true };
     }
   }
 
-  return { gamesUpdated, teamsCount: teams.length };
+  let gamesUpdated = 0;
+  const teamUpdatePromises = [];
+
+  // Process teams in parallel for better performance
+  for (const team of teams) {
+    const updatePromise = (async () => {
+      try {
+        const teamGames = await scrapeTeamSchedule(team, division.id);
+        await DatabaseService.updateTeamScrapedTime(team.id);
+        console.log(`📅 Updated ${teamGames.length} games for team ${team.name}`);
+        return teamGames.length;
+      } catch (teamError) {
+        console.error(`❌ Error scraping team ${team.id}:`, teamError);
+        return 0;
+      }
+    })();
+    
+    teamUpdatePromises.push(updatePromise);
+  }
+
+  // Wait for all team updates to complete
+  const results = await Promise.all(teamUpdatePromises);
+  gamesUpdated = results.reduce((sum, count) => sum + count, 0);
+
+  return { 
+    gamesUpdated, 
+    teamsCount: teams.length,
+    selective: !forceRefresh,
+    processed: teams.length 
+  };
 }
 
 async function scrapeAndStoreTeams(division) {
   const response = await fetch(`${MUFA_BASE_URL}/League/Division/HomeArticle.aspx?d=${division.id}`, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    }
+    headers: httpHeaders
   });
 
   if (!response.ok) {
@@ -197,9 +252,7 @@ async function scrapeAndStoreTeams(division) {
 
 async function scrapeTeamSchedule(team, divisionId) {
   const response = await fetch(`${MUFA_BASE_URL}/League/Division/Team.aspx?t=${team.id}&d=${divisionId}`, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    }
+    headers: httpHeaders
   });
 
   if (!response.ok) {
