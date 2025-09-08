@@ -25,7 +25,10 @@ async function handler(req, res) {
     const currentScores = currentGames.filter(g => g.is_complete).length;
 
     // Trigger scraping for this specific division
-    const scrapeResponse = await fetch(`${process.env.VERCEL_URL || 'http://localhost:3000'}/api/cron/scrape-schedule?admin=true&divisionId=${divisionId}`, {
+    const baseUrl = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : 'http://localhost:3000';
+    const scrapeResponse = await fetch(`${baseUrl}/api/cron/scrape-schedule?admin=true&divisionId=${divisionId}`, {
       method: 'GET',
       headers: {
         'User-Agent': 'Manual-Refresh-Internal'
