@@ -35,8 +35,8 @@ describe('MUFA Scraper Tests', () => {
         const href = $link.attr('href');
         const name = $link.text().trim();
         
-        const teamMatch = href.match(/[?&]t=(\\d+)/);
-        const divisionMatch = href.match(/[?&]d=(\\d+)/);
+        const teamMatch = href.match(/[?&]t=(\d+)/);
+        const divisionMatch = href.match(/[?&]d=(\d+)/);
         
         if (teamMatch && divisionMatch) {
           teams.push({
@@ -137,7 +137,7 @@ describe('Field Information Extraction', () => {
 
   test('should extract field address', () => {
     const $ = cheerio.load(mockFieldHTML);
-    const addressPattern = /\\d+\\s+[^,]+,\\s*Madison,\\s*WI\\s*\\d{5}/;
+    const addressPattern = /\d+\s+[^,]+,\s*Madison,\s*WI\s*\d{5}/;
     const pageText = $('body').text();
     const addressMatch = pageText.match(addressPattern);
     

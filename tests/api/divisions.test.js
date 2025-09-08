@@ -14,7 +14,7 @@ const { DatabaseService } = require('../../api/_lib/database/connection.js');
 const express = require('express');
 const app = express();
 app.use(express.json());
-app.get('/api/v2/divisions', (req, res) => divisionsHandler.default(req, res));
+app.all('/api/v2/divisions', (req, res) => divisionsHandler.default(req, res));
 
 describe('API: /api/v2/divisions', () => {
   beforeEach(() => {

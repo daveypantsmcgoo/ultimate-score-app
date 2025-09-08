@@ -3,7 +3,7 @@ const path = require('path');
 
 // Set test environment variables
 process.env.NODE_ENV = 'test';
-process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/test';
+process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL || 'postgresql://test_user:test_password@localhost:5433/mufa_test';
 
 // Mock console methods in tests to reduce noise
 if (process.env.NODE_ENV === 'test') {
