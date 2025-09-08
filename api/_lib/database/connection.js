@@ -1,7 +1,15 @@
-import { sql } from '@vercel/postgres';
+import postgres from 'postgres';
 
-// Database connection wrapper for Vercel Postgres
-export const db = sql;
+// Database connection using Neon's DATABASE_URL
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error('DATABASE_URL environment variable is not set');
+}
+
+export const sql = postgres(connectionString, {
+  max: 1, // Limit connections for serverless
+});
 
 // Helper functions for common database operations
 export class DatabaseService {
