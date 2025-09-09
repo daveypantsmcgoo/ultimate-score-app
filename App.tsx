@@ -5,6 +5,7 @@ import { TeamSelectionScreen } from './src/screens/TeamSelectionScreen';
 import { ScoringScreen } from './src/screens/ScoringScreen';
 import { GameHistoryScreen } from './src/screens/GameHistoryScreen';
 import { Team } from './src/types';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import './global.css';
 
 type Screen = 'team-selection' | 'scoring' | 'history';
@@ -32,6 +33,10 @@ export default function App() {
   const handleBackFromHistory = () => {
     setCurrentScreen('scoring');
   };
+
+  <div>
+      <SpeedInsights />
+    </div>
 
   const renderScreen = () => {
     switch (currentScreen) {

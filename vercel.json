@@ -1,12 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/cron/scrape-schedule",
+      "path": "/api/cron/scrape-schedules-only",
       "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/cron/scrape-fields", 
-      "schedule": "0 7 * * *"
     }
   ],
   "headers": [
