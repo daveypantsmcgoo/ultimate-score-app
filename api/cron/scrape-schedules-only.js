@@ -1,7 +1,7 @@
 import { load } from 'cheerio';
 import { DatabaseService, sql } from '../_lib/database/connection.js';
 
-const MUFA_BASE_URL = 'https://www.mufa.org';
+const MUFA_BASE_URL = 'https://mufa.org';
 
 export default async function handler(req, res) {
   // Verify this is a cron request or admin request
@@ -116,35 +116,60 @@ async function scrapeTeamScheduleOnly(team) {
   
   const games = [];
   
-  $('.clickable-row').each((index, element) => {
+  $('.clickable-row.top-level-row').each((index, element) => {
     try {
       const $row = $(element);
-      const cells = $row.find('div, td');
       
-      if (cells.length >= 4) {
-        const dateText = $(cells[0]).text().trim();
-        const timeText = $(cells[1]).text().trim();
-        const matchupText = $(cells[2]).text().trim();
-        const fieldText = $(cells[3]).text().trim();
-        
-        // Parse date and time
-        const gameDate = parseMufaDate(dateText);
-        const gameTime = parseMufaTime(timeText);
-        
-        if (gameDate && gameTime && matchupText && fieldText) {
-          // Parse teams from matchup (e.g., "Team A vs Team B" or "vs Team B")
-          const { teamA, teamB } = parseMatchup(matchupText, team);
-          
-          if (teamA && teamB) {
-            games.push({
-              teamA,
-              teamB,
-              date: gameDate,
-              time: gameTime,
-              field: fieldText.trim(),
-              divisionId: team.division_id
-            });
+      // Extract date and time from the first col-8 div (e.g., "Tue, Jun-02 7:30 PM")
+      const dateTimeText = $row.find('.col-8 strong').first().text().trim();
+      
+      // Extract opponent team name from the link in col-8 text-right
+      const opponentLink = $row.find('.col-8.text-right a');
+      const opponentName = opponentLink.length > 0 ? opponentLink.text().trim() : null;
+      
+      // Extract field from the location row (usually contains field info)
+      let fieldText = '';
+      const locationDivs = $row.find('div').filter((i, el) => {
+        const text = $(el).text().trim();
+        return text.includes('Field') || text.includes('Park') || text.includes('School') || 
+               text.includes('Memorial') || text.includes('East') || text.includes('West') ||
+               text.includes('North') || text.includes('South') || text.includes('Madison');
+      });
+      
+      if (locationDivs.length > 0) {
+        fieldText = $(locationDivs[0]).text().trim();
+      } else {
+        // Fallback: look for any text that might be a field
+        const allDivs = $row.find('div');
+        for (let i = 0; i < allDivs.length; i++) {
+          const text = $(allDivs[i]).text().trim();
+          if (text && !text.includes('Opp.') && !text.includes('Jersey') && 
+              !text.includes('White') && !text.includes('Dark') && 
+              !text.includes('PM') && !text.includes('AM') &&
+              text.length > 5) {
+            fieldText = text;
+            break;
           }
+        }
+      }
+      
+      if (dateTimeText && opponentName) {
+        // Parse date and time from combined string
+        const { gameDate, gameTime } = parseMufaDateTime(dateTimeText);
+        
+        if (gameDate && gameTime) {
+          // Create team objects
+          const teamA = { id: team.id, name: team.name };
+          const teamB = { id: 'unknown', name: opponentName };
+          
+          games.push({
+            teamA,
+            teamB,
+            date: gameDate,
+            time: gameTime,
+            field: fieldText || 'TBD',
+            divisionId: team.division_id
+          });
         }
       }
     } catch (error) {
@@ -199,53 +224,27 @@ async function storeGameOptimized(game) {
 }
 
 // Helper functions
-function parseMufaDate(dateText) {
-  // Handle formats like "Sun, Sep-07" or "Sun Sep-07"
-  const match = dateText.match(/\b(\w{3})[,\s]*(\w{3})-(\d{1,2})\b/);
-  if (!match) return null;
+function parseMufaDateTime(dateTimeText) {
+  // Handle formats like "Tue, Jun-02 7:30 PM" or "Thu, Jul-02 6:00 PM"
+  const match = dateTimeText.match(/(\w{3}),?\s*(\w{3})-(\d{1,2})\s+(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) return { gameDate: null, gameTime: null };
   
-  const [, , monthStr, day] = match;
+  const [, , monthStr, day, hours, minutes, ampm] = match;
+  
+  // Parse date
   const year = new Date().getFullYear();
   const month = new Date(`${monthStr} 1, ${year}`).getMonth();
+  const gameDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   
-  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  // Parse time
+  let hour = parseInt(hours);
+  if (ampm.toUpperCase() === 'PM' && hour !== 12) hour += 12;
+  if (ampm.toUpperCase() === 'AM' && hour === 12) hour = 0;
+  const gameTime = `${String(hour).padStart(2, '0')}:${minutes}:00`;
+  
+  return { gameDate, gameTime };
 }
 
-function parseMufaTime(timeText) {
-  // Handle formats like "6:00 PM" or "18:00"
-  const match = timeText.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-  if (!match) return null;
-  
-  let [, hours, minutes, ampm] = match;
-  hours = parseInt(hours);
-  
-  if (ampm) {
-    if (ampm.toUpperCase() === 'PM' && hours !== 12) hours += 12;
-    if (ampm.toUpperCase() === 'AM' && hours === 12) hours = 0;
-  }
-  
-  return `${String(hours).padStart(2, '0')}:${minutes}:00`;
-}
-
-function parseMatchup(matchupText, currentTeam) {
-  // Handle "vs Team Name" or "Team A vs Team B"
-  if (matchupText.startsWith('vs ')) {
-    return {
-      teamA: { id: currentTeam.id, name: currentTeam.name },
-      teamB: { id: 'unknown', name: matchupText.substring(3).trim() }
-    };
-  }
-  
-  const parts = matchupText.split(' vs ');
-  if (parts.length === 2) {
-    return {
-      teamA: { id: 'unknown', name: parts[0].trim() },
-      teamB: { id: 'unknown', name: parts[1].trim() }
-    };
-  }
-  
-  return null;
-}
 
 function generateFieldId(fieldName) {
   return fieldName.toLowerCase()

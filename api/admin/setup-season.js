@@ -2,7 +2,7 @@ import { load } from 'cheerio';
 import { DatabaseService, sql } from '../_lib/database/connection.js';
 import { requireAdmin } from '../_lib/auth/middleware.js';
 
-const MUFA_BASE_URL = 'https://www.mufa.org';
+const MUFA_BASE_URL = 'https://mufa.org';
 
 async function handler(req, res) {
   if (req.method !== 'POST') {

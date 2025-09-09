@@ -1,6 +1,6 @@
 const request = require('supertest');
 const express = require('express');
-const scraperHandler = require('../../api/cron/scrape-schedule.js');
+const scraperHandler = require('../../api/cron/scrape-schedules-only.js');
 
 // Mock the database service
 jest.mock('../../api/_lib/database/connection.js', () => ({
@@ -16,7 +16,7 @@ const { DatabaseService } = require('../../api/_lib/database/connection.js');
 // Create test app
 const app = express();
 app.use(express.json());
-app.get('/api/cron/scrape-schedule', (req, res) => scraperHandler.default(req, res));
+app.get('/api/cron/scrape-schedules-only', (req, res) => scraperHandler.default(req, res));
 
 describe('Integration: Scraper', () => {
   beforeEach(() => {
@@ -54,7 +54,7 @@ describe('Integration: Scraper', () => {
       });
 
     const response = await request(app)
-      .get('/api/cron/scrape-schedule?admin=true')
+      .get('/api/cron/scrape-schedules-only?admin=true')
       .expect(200);
 
     expect(response.body.success).toBe(true);
@@ -66,7 +66,7 @@ describe('Integration: Scraper', () => {
     DatabaseService.getCurrentSeason.mockResolvedValue(null);
 
     const response = await request(app)
-      .get('/api/cron/scrape-schedule?admin=true')
+      .get('/api/cron/scrape-schedules-only?admin=true')
       .expect(500);
 
     expect(response.body.success).toBe(false);
@@ -82,7 +82,7 @@ describe('Integration: Scraper', () => {
     DatabaseService.getTeams = mockGetTeams;
 
     const response = await request(app)
-      .get('/api/cron/scrape-schedule?admin=true')
+      .get('/api/cron/scrape-schedules-only?admin=true')
       .expect(500);
 
     expect(response.body.success).toBe(false);
@@ -101,7 +101,7 @@ describe('Integration: Scraper', () => {
     global.fetch = jest.fn().mockRejectedValue(new Error('Network error'));
 
     const response = await request(app)
-      .get('/api/cron/scrape-schedule?admin=true')
+      .get('/api/cron/scrape-schedules-only?admin=true')
       .expect(500);
 
     expect(response.body.success).toBe(false);
@@ -110,7 +110,7 @@ describe('Integration: Scraper', () => {
 
   test('should require admin parameter', async () => {
     const response = await request(app)
-      .get('/api/cron/scrape-schedule')
+      .get('/api/cron/scrape-schedules-only')
       .expect(403);
 
     expect(response.body.error).toBe('Admin access required');
@@ -120,7 +120,7 @@ describe('Integration: Scraper', () => {
     DatabaseService.getDivisions.mockResolvedValue([]);
 
     const response = await request(app)
-      .get('/api/cron/scrape-schedule?admin=true')
+      .get('/api/cron/scrape-schedules-only?admin=true')
       .expect(200);
 
     expect(response.body.success).toBe(true);
@@ -135,7 +135,7 @@ describe('Integration: Scraper', () => {
     });
 
     const response = await request(app)
-      .get('/api/cron/scrape-schedule?admin=true')
+      .get('/api/cron/scrape-schedules-only?admin=true')
       .expect(200);
 
     expect(response.body).toHaveProperty('duration');
