@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   }
 
   const startTime = Date.now();
-  console.log('⚡ Starting optimized schedule-only scraping (v2)...');
+  console.log('⚡ Starting optimized schedule-only scraping (v3 - fixed parsing)...');
 
   try {
     // Get current season
@@ -116,22 +116,16 @@ async function scrapeTeamScheduleOnly(team) {
   
   const games = [];
   
-  console.log(`🔍 Parsing team ${team.name} - looking for .clickable-row.top-level-row elements`);
-  const rows = $('.clickable-row.top-level-row');
-  console.log(`🔍 Found ${rows.length} game rows for ${team.name}`);
-  
-  rows.each((index, element) => {
+  $('.clickable-row.top-level-row').each((index, element) => {
     try {
       const $row = $(element);
       
       // Extract date and time from the first col-8 div (e.g., "Tue, Jun-02 7:30 PM")
       const dateTimeText = $row.find('.col-8 strong').first().text().trim();
-      console.log(`🔍 Date/time text for ${team.name}: "${dateTimeText}"`);
       
       // Extract opponent team name from the link in col-8 text-right
       const opponentLink = $row.find('.col-8.text-right a');
       const opponentName = opponentLink.length > 0 ? opponentLink.text().trim() : null;
-      console.log(`🔍 Opponent name for ${team.name}: "${opponentName}"`);
       
       // Extract field from the location row (usually contains field info)
       let fieldText = '';
