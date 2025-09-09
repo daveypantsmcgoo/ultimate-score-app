@@ -1,4 +1,4 @@
-import { DatabaseService } from '../_lib/database/connection.js';
+import { DatabaseService, sql } from '../_lib/database/connection.js';
 
 export default async function handler(req, res) {
   // Security check
@@ -14,7 +14,7 @@ export default async function handler(req, res) {
       console.log('🌟 No current season found, creating Fall 2025...');
       
       // Create Fall 2025 season
-      await DatabaseService.sql`
+      await sql`
         INSERT INTO seasons (id, name, start_date, end_date, is_current)
         VALUES ('fall-2025', 'Fall 2025', '2025-08-01', '2025-12-31', TRUE)
         ON CONFLICT (id) DO UPDATE SET
@@ -31,8 +31,8 @@ export default async function handler(req, res) {
 
     // Get stats
     const divisions = await DatabaseService.getDivisions();
-    const teams = await DatabaseService.sql`SELECT COUNT(*) as count FROM teams`;
-    const games = await DatabaseService.sql`SELECT COUNT(*) as count FROM games`;
+    const teams = await sql`SELECT COUNT(*) as count FROM teams`;
+    const games = await sql`SELECT COUNT(*) as count FROM games`;
 
     return res.status(200).json({
       success: true,

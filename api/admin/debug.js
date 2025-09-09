@@ -1,4 +1,4 @@
-import { DatabaseService } from '../_lib/database/connection.js';
+import { DatabaseService, sql } from '../_lib/database/connection.js';
 
 export default async function handler(req, res) {
   // Security check
@@ -11,16 +11,16 @@ export default async function handler(req, res) {
     const currentSeason = await DatabaseService.getCurrentSeason();
     
     // Get all seasons
-    const allSeasons = await DatabaseService.sql`SELECT * FROM seasons ORDER BY created_at DESC`;
+    const allSeasons = await sql`SELECT * FROM seasons ORDER BY created_at DESC`;
     
     // Get divisions count  
     const divisions = await DatabaseService.getDivisions();
     
     // Get teams count
-    const teams = await DatabaseService.sql`SELECT COUNT(*) as count FROM teams`;
+    const teams = await sql`SELECT COUNT(*) as count FROM teams`;
     
     // Get games count
-    const games = await DatabaseService.sql`SELECT COUNT(*) as count FROM games`;
+    const games = await sql`SELECT COUNT(*) as count FROM games`;
 
     return res.status(200).json({
       success: true,
