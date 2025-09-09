@@ -59,11 +59,12 @@ export class DatabaseService {
   // Get current season
   static async getCurrentSeason() {
     try {
-      const result = await sql`
+      // Use .unsafe() to avoid cached plan issues after schema changes
+      const result = await sql.unsafe(`
         SELECT * FROM seasons 
         WHERE is_current = TRUE 
         LIMIT 1
-      `;
+      `);
       console.log('🏛️ Current season query result:', result?.length || 0, 'seasons found');
       // Handle postgres package result format (no .rows property)
       return result?.[0] || null;
@@ -221,9 +222,9 @@ export class DatabaseService {
   // Check if force refresh is enabled
   static async shouldForceRefresh() {
     try {
-      const result = await sql`
+      const result = await sql.unsafe(`
         SELECT force_refresh FROM seasons WHERE is_current = TRUE LIMIT 1
-      `;
+      `);
       return result?.[0]?.force_refresh || false;
     } catch (error) {
       console.error('Error checking force refresh:', error);
