@@ -102,11 +102,12 @@ export class DatabaseService {
   // Get teams for a division
   static async getTeams(divisionId) {
     try {
-      const result = await sql`
+      // Use .unsafe() to avoid cached plan issues after schema changes
+      const result = await sql.unsafe(`
         SELECT * FROM teams 
-        WHERE division_id = ${divisionId} AND is_active = TRUE
+        WHERE division_id = '${divisionId}' AND is_active = TRUE
         ORDER BY name
-      `;
+      `);
       console.log(`👥 Teams query result for division ${divisionId}:`, result?.length || 0, 'teams found');
       return result || [];
     } catch (error) {
@@ -118,7 +119,8 @@ export class DatabaseService {
   // Get games for a team
   static async getTeamSchedule(teamId, divisionId) {
     try {
-      const result = await sql`
+      // Use .unsafe() to avoid cached plan issues after schema changes
+      const result = await sql.unsafe(`
         SELECT 
           g.*,
           ta.name as team_a_name,
@@ -130,10 +132,10 @@ export class DatabaseService {
         LEFT JOIN teams ta ON g.team_a_id = ta.id
         LEFT JOIN teams tb ON g.team_b_id = tb.id
         LEFT JOIN fields f ON g.field_id = f.id
-        WHERE (g.team_a_id = ${teamId} OR g.team_b_id = ${teamId})
-          AND g.division_id = ${divisionId}
+        WHERE (g.team_a_id = '${teamId}' OR g.team_b_id = '${teamId}')
+          AND g.division_id = '${divisionId}'
         ORDER BY g.game_datetime ASC
-      `;
+      `);
       return result || [];
     } catch (error) {
       console.error('Error getting team schedule:', error);
@@ -188,29 +190,29 @@ export class DatabaseService {
       
       const cutoffTime = new Date(Date.now() - maxAgeMinutes * 60 * 1000);
       
-      let query;
+      let result;
       if (divisionId) {
-        query = sql`
+        // Use .unsafe() to avoid cached plan issues after schema changes
+        result = await sql.unsafe(`
           SELECT t.*, d.name as division_name
           FROM teams t
           LEFT JOIN divisions d ON t.division_id = d.id
-          WHERE t.division_id = ${divisionId}
-            AND (t.last_scraped IS NULL OR t.last_scraped < ${cutoffTime})
+          WHERE t.division_id = '${divisionId}'
+            AND (t.last_scraped IS NULL OR t.last_scraped < '${cutoffTime.toISOString()}')
             AND t.is_active = TRUE
           ORDER BY t.last_scraped ASC NULLS FIRST
-        `;
+        `);
       } else {
-        query = sql`
+        result = await sql.unsafe(`
           SELECT t.*, d.name as division_name
           FROM teams t
           LEFT JOIN divisions d ON t.division_id = d.id
-          WHERE (t.last_scraped IS NULL OR t.last_scraped < ${cutoffTime})
+          WHERE (t.last_scraped IS NULL OR t.last_scraped < '${cutoffTime.toISOString()}')
             AND t.is_active = TRUE
           ORDER BY t.last_scraped ASC NULLS FIRST
-        `;
+        `);
       }
       
-      const result = await query;
       console.log(`📊 Found ${result?.length || 0} stale teams (older than ${maxAgeMinutes} minutes)`);
       return result || [];
     } catch (error) {
@@ -249,11 +251,12 @@ export class DatabaseService {
   // Update team's last scraped timestamp
   static async updateTeamScrapedTime(teamId) {
     try {
-      await sql`
+      // Use .unsafe() to avoid cached plan issues after schema changes
+      await sql.unsafe(`
         UPDATE teams 
         SET last_scraped = NOW() 
-        WHERE id = ${teamId}
-      `;
+        WHERE id = '${teamId}'
+      `);
     } catch (error) {
       console.error(`Error updating scraped time for team ${teamId}:`, error);
     }
