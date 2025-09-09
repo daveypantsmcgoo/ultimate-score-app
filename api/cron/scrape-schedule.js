@@ -26,10 +26,35 @@ export default async function handler(req, res) {
   console.log('🕐 Starting scheduled MUFA data scraping...');
 
   try {
+    // Debug: Check database connection and migration
+    console.log('🔍 Testing database connection and migration...');
+    await DatabaseService.ensureMigration();
+    
+    // Debug: Try to find any seasons
+    const debugSeasons = await sql`SELECT * FROM seasons ORDER BY created_at DESC LIMIT 5`;
+    console.log('🔍 Debug seasons found:', debugSeasons?.length || 0, debugSeasons);
+
     // Get current season and divisions
-    const currentSeason = await DatabaseService.getCurrentSeason();
+    let currentSeason = await DatabaseService.getCurrentSeason();
+    console.log('🔍 Current season result:', currentSeason);
+    
     if (!currentSeason) {
-      throw new Error('No current season found in database');
+      // Try to create season if missing
+      console.log('🌟 Creating Fall 2025 season in scraper...');
+      await sql`
+        INSERT INTO seasons (id, name, start_date, end_date, is_current)
+        VALUES ('fall-2025', 'Fall 2025', '2025-08-01', '2025-12-31', TRUE)
+        ON CONFLICT (id) DO UPDATE SET
+          is_current = TRUE,
+          updated_at = NOW()
+      `;
+      
+      currentSeason = await DatabaseService.getCurrentSeason();
+      console.log('🔍 After creation, current season:', currentSeason);
+      
+      if (!currentSeason) {
+        throw new Error('No current season found in database even after creation attempt');
+      }
     }
 
     const divisions = await DatabaseService.getDivisions(currentSeason.id);
